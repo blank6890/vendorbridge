@@ -1,18 +1,21 @@
-from flask import Blueprint, request, jsonify
 from datetime import datetime, timezone
+
 from bson import ObjectId
+from flask import Blueprint, jsonify, request
+
 from models.vendor import get_vendor_collection
+from utils.rbac import require_roles
 
 vendors_bp = Blueprint("vendors", __name__)
 
 
 def _serialize_vendor(vendor):
-    """Convert MongoDB vendor document to JSON-safe dict."""
     vendor["_id"] = str(vendor["_id"])
     return vendor
 
 
-@vendors_bp.route("/vendors", methods=["GET"])
+@vendors_bp.route("/", strict_slashes=False, methods=["GET"])
+@require_roles("officer", "manager")
 def list_vendors():
     """List all vendors with optional category filter."""
     vendors = get_vendor_collection()
@@ -29,7 +32,8 @@ def list_vendors():
     return jsonify([_serialize_vendor(v) for v in result]), 200
 
 
-@vendors_bp.route("/vendors", methods=["POST"])
+@vendors_bp.route("/", strict_slashes=False, methods=["POST"])
+@require_roles("officer")
 def add_vendor():
     """Add a new vendor."""
     data = request.get_json()
@@ -53,16 +57,18 @@ def add_vendor():
     }
 
     result = vendors.insert_one(vendor)
-
     _log_activity("Vendor added", f"{data['name']} ({data['category']})")
 
-    return jsonify({
-        "message": "Vendor added successfully",
-        "vendorId": str(result.inserted_id),
-    }), 201
+    return jsonify(
+        {
+            "message": "Vendor added successfully",
+            "vendorId": str(result.inserted_id),
+        }
+    ), 201
 
 
-@vendors_bp.route("/vendors/<vendor_id>", methods=["PUT"])
+@vendors_bp.route("/<vendor_id>", strict_slashes=False, methods=["PUT"])
+@require_roles("officer")
 def update_vendor(vendor_id):
     """Update an existing vendor."""
     data = request.get_json()
@@ -87,13 +93,13 @@ def update_vendor(vendor_id):
 
     update_fields["updated_at"] = datetime.now(timezone.utc)
     vendors.update_one({"_id": obj_id}, {"$set": update_fields})
-
     _log_activity("Vendor updated", f"{existing['name']} (ID: {vendor_id})")
 
     return jsonify({"message": "Vendor updated successfully"}), 200
 
 
-@vendors_bp.route("/vendors/<vendor_id>", methods=["DELETE"])
+@vendors_bp.route("/<vendor_id>", strict_slashes=False, methods=["DELETE"])
+@require_roles("officer")
 def delete_vendor(vendor_id):
     """Delete a vendor."""
     vendors = get_vendor_collection()
@@ -108,21 +114,22 @@ def delete_vendor(vendor_id):
         return jsonify({"error": "Vendor not found"}), 404
 
     vendors.delete_one({"_id": obj_id})
-
     _log_activity("Vendor deleted", f"{existing['name']} (ID: {vendor_id})")
 
     return jsonify({"message": "Vendor deleted successfully"}), 200
 
 
 def _log_activity(action, details):
-    """Log vendor-related activities."""
     from pymongo import MongoClient
-    from config import MONGO_URI, DB_NAME
+
+    from config import DB_NAME, MONGO_URI
 
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
-    db["logs"].insert_one({
-        "action": action,
-        "details": details,
-        "timestamp": datetime.now(timezone.utc),
-    })
+    db["logs"].insert_one(
+        {
+            "action": action,
+            "details": details,
+            "timestamp": datetime.now(timezone.utc),
+        }
+    )

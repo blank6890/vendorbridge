@@ -1,31 +1,27 @@
-from flask import Blueprint, request, make_response, jsonify
-from datetime import datetime, timezone
-from models.purchase_order import get_po_collection
+from flask import Blueprint, make_response, request
+
 from models.invoice import get_invoice_collection
+from models.purchase_order import get_po_collection
 from utils.csv_export import generate_csv
+from utils.rbac import require_roles
 
 reports_bp = Blueprint("reports", __name__)
 
 
-@reports_bp.route("/export", methods=["GET"])
+@reports_bp.route("/export", strict_slashes=False, methods=["GET"])
+@require_roles("officer", "manager")
 def export_csv():
-    """Export all POs and invoices as a CSV download.
-
-    Query params:
-        type: "po" | "invoice" | "all" (default: "all")
-    """
+    """Export all POs and invoices as a CSV download."""
     export_type = request.args.get("type", "all")
 
     if export_type == "po":
         return _export_pos()
-    elif export_type == "invoice":
+    if export_type == "invoice":
         return _export_invoices()
-    else:
-        return _export_all()
+    return _export_all()
 
 
 def _export_pos():
-    """Export purchase orders as CSV."""
     po_collection = get_po_collection()
     pos = list(po_collection.find())
 
@@ -42,7 +38,6 @@ def _export_pos():
 
 
 def _export_invoices():
-    """Export invoices as CSV."""
     invoice_collection = get_invoice_collection()
     invoices = list(invoice_collection.find())
 
@@ -59,7 +54,6 @@ def _export_invoices():
 
 
 def _export_all():
-    """Export both POs and invoices in a combined CSV."""
     po_collection = get_po_collection()
     invoice_collection = get_invoice_collection()
 
@@ -69,30 +63,34 @@ def _export_all():
     combined = []
 
     for po in pos:
-        combined.append({
-            "type": "PurchaseOrder",
-            "number": po.get("poNumber", ""),
-            "referenceId": str(po["_id"]),
-            "vendorId": po.get("vendorId", ""),
-            "amount": po.get("totalAmount", 0),
-            "tax": "",
-            "total": po.get("totalAmount", 0),
-            "status": po.get("status", ""),
-            "created_at": po.get("created_at", ""),
-        })
+        combined.append(
+            {
+                "type": "PurchaseOrder",
+                "number": po.get("poNumber", ""),
+                "referenceId": str(po["_id"]),
+                "vendorId": po.get("vendorId", ""),
+                "amount": po.get("totalAmount", 0),
+                "tax": "",
+                "total": po.get("totalAmount", 0),
+                "status": po.get("status", ""),
+                "created_at": po.get("created_at", ""),
+            }
+        )
 
     for inv in invoices:
-        combined.append({
-            "type": "Invoice",
-            "number": inv.get("invoiceNumber", ""),
-            "referenceId": str(inv["_id"]),
-            "vendorId": inv.get("poId", ""),
-            "amount": inv.get("subtotal", 0),
-            "tax": inv.get("tax", 0),
-            "total": inv.get("total", 0),
-            "status": inv.get("status", ""),
-            "created_at": inv.get("created_at", ""),
-        })
+        combined.append(
+            {
+                "type": "Invoice",
+                "number": inv.get("invoiceNumber", ""),
+                "referenceId": str(inv["_id"]),
+                "vendorId": inv.get("poId", ""),
+                "amount": inv.get("subtotal", 0),
+                "tax": inv.get("tax", 0),
+                "total": inv.get("total", 0),
+                "status": inv.get("status", ""),
+                "created_at": inv.get("created_at", ""),
+            }
+        )
 
     fields = ["type", "number", "referenceId", "vendorId", "amount", "tax", "total", "status", "created_at"]
     csv_data = generate_csv(combined, fields)

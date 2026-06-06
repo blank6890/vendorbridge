@@ -28,6 +28,7 @@ SEED_USERS = [
         "email": "admin@vendorbridge.com",
         "password": hash_password("password123"),
         "role": "admin",
+        "status": "approved",
         "created_at": datetime.now(timezone.utc),
     },
     {
@@ -35,6 +36,7 @@ SEED_USERS = [
         "email": "officer@vendorbridge.com",
         "password": hash_password("password123"),
         "role": "officer",
+        "status": "approved",
         "created_at": datetime.now(timezone.utc),
     },
     {
@@ -42,6 +44,7 @@ SEED_USERS = [
         "email": "vendor@vendorbridge.com",
         "password": hash_password("password123"),
         "role": "vendor",
+        "status": "approved",
         "created_at": datetime.now(timezone.utc),
     },
     {
@@ -49,6 +52,7 @@ SEED_USERS = [
         "email": "manager@vendorbridge.com",
         "password": hash_password("password123"),
         "role": "manager",
+        "status": "approved",
         "created_at": datetime.now(timezone.utc),
     },
 ]

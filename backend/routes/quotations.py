@@ -1,18 +1,21 @@
-from flask import Blueprint, request, jsonify
 from datetime import datetime, timezone
+
 from bson import ObjectId
+from flask import Blueprint, jsonify, request
+
 from models.quotation import get_quotation_collection
+from utils.rbac import require_roles
 
 quotations_bp = Blueprint("quotations", __name__)
 
 
 def _serialize_quotation(q):
-    """Convert MongoDB quotation document to JSON-safe dict."""
     q["_id"] = str(q["_id"])
     return q
 
 
-@quotations_bp.route("/quotations", methods=["GET"])
+@quotations_bp.route("/", strict_slashes=False, methods=["GET"])
+@require_roles("officer", "manager", "vendor")
 def list_quotations():
     """List all quotations with optional filters."""
     quotations = get_quotation_collection()
@@ -32,7 +35,8 @@ def list_quotations():
     return jsonify([_serialize_quotation(q) for q in result]), 200
 
 
-@quotations_bp.route("/quotations", methods=["POST"])
+@quotations_bp.route("/", strict_slashes=False, methods=["POST"])
+@require_roles("vendor")
 def submit_quotation():
     """Submit a new quotation for an RFQ."""
     data = request.get_json()
@@ -55,16 +59,21 @@ def submit_quotation():
     }
 
     result = quotations.insert_one(quotation)
+    _log_activity(
+        "Quotation submitted",
+        f"RFQ: {data['rfqId']}, Vendor: {data['vendorId']}, Price: {data['price']}",
+    )
 
-    _log_activity("Quotation submitted", f"RFQ: {data['rfqId']}, Vendor: {data['vendorId']}, Price: {data['price']}")
+    return jsonify(
+        {
+            "message": "Quotation submitted successfully",
+            "quotationId": str(result.inserted_id),
+        }
+    ), 201
 
-    return jsonify({
-        "message": "Quotation submitted successfully",
-        "quotationId": str(result.inserted_id),
-    }), 201
 
-
-@quotations_bp.route("/quotations/<quotation_id>", methods=["PUT"])
+@quotations_bp.route("/<quotation_id>", strict_slashes=False, methods=["PUT"])
+@require_roles("vendor", "officer")
 def update_quotation(quotation_id):
     """Update quotation details or status."""
     data = request.get_json()
@@ -89,21 +98,22 @@ def update_quotation(quotation_id):
 
     update_fields["updated_at"] = datetime.now(timezone.utc)
     quotations.update_one({"_id": obj_id}, {"$set": update_fields})
-
     _log_activity("Quotation updated", f"Quotation ID: {quotation_id}")
 
     return jsonify({"message": "Quotation updated successfully"}), 200
 
 
 def _log_activity(action, details):
-    """Log quotation-related activities."""
     from pymongo import MongoClient
-    from config import MONGO_URI, DB_NAME
+
+    from config import DB_NAME, MONGO_URI
 
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
-    db["logs"].insert_one({
-        "action": action,
-        "details": details,
-        "timestamp": datetime.now(timezone.utc),
-    })
+    db["logs"].insert_one(
+        {
+            "action": action,
+            "details": details,
+            "timestamp": datetime.now(timezone.utc),
+        }
+    )

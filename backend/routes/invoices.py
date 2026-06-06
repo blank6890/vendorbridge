@@ -1,19 +1,22 @@
-from flask import Blueprint, request, jsonify
 from datetime import datetime, timezone
+
 from bson import ObjectId
+from flask import Blueprint, jsonify, request
+
 from models.invoice import get_invoice_collection, get_next_invoice_number
 from models.purchase_order import get_po_collection
+from utils.rbac import require_roles
 
 invoices_bp = Blueprint("invoices", __name__)
 
 
 def _serialize_invoice(inv):
-    """Convert MongoDB invoice document to JSON-safe dict."""
     inv["_id"] = str(inv["_id"])
     return inv
 
 
-@invoices_bp.route("/invoices", methods=["GET"])
+@invoices_bp.route("/", strict_slashes=False, methods=["GET"])
+@require_roles("officer", "manager", "vendor")
 def list_invoices():
     """List all invoices with optional filters."""
     invoice_collection = get_invoice_collection()
@@ -30,7 +33,8 @@ def list_invoices():
     return jsonify([_serialize_invoice(inv) for inv in result]), 200
 
 
-@invoices_bp.route("/invoices", methods=["POST"])
+@invoices_bp.route("/", strict_slashes=False, methods=["POST"])
+@require_roles("officer")
 def generate_invoice():
     """Generate an invoice from a Purchase Order."""
     data = request.get_json()
@@ -38,7 +42,6 @@ def generate_invoice():
     if "poId" not in data:
         return jsonify({"error": "'poId' is required"}), 400
 
-    # Fetch the PO to calculate totals
     po_collection = get_po_collection()
     try:
         po = po_collection.find_one({"_id": ObjectId(data["poId"])})
@@ -48,7 +51,6 @@ def generate_invoice():
     if not po:
         return jsonify({"error": "Purchase order not found"}), 404
 
-    # Calculate tax (default 18% GST if not provided)
     tax_rate = float(data.get("taxRate", 18)) / 100
     subtotal = po["totalAmount"]
     tax_amount = round(subtotal * tax_rate, 2)
@@ -69,21 +71,23 @@ def generate_invoice():
     }
 
     result = invoice_collection.insert_one(invoice)
-
     _log_activity(
         "Invoice generated",
         f"Invoice: {invoice_number}, PO: {po['poNumber']}, Total: {total}",
     )
 
-    return jsonify({
-        "message": "Invoice generated successfully",
-        "invoiceId": str(result.inserted_id),
-        "invoiceNumber": invoice_number,
-        "total": total,
-    }), 201
+    return jsonify(
+        {
+            "message": "Invoice generated successfully",
+            "invoiceId": str(result.inserted_id),
+            "invoiceNumber": invoice_number,
+            "total": total,
+        }
+    ), 201
 
 
-@invoices_bp.route("/invoices/<invoice_id>", methods=["PUT"])
+@invoices_bp.route("/<invoice_id>", strict_slashes=False, methods=["PUT"])
+@require_roles("officer")
 def update_invoice(invoice_id):
     """Update invoice status (e.g., mark as paid)."""
     data = request.get_json()
@@ -107,21 +111,22 @@ def update_invoice(invoice_id):
 
     update_fields["updated_at"] = datetime.now(timezone.utc)
     invoice_collection.update_one({"_id": obj_id}, {"$set": update_fields})
-
     _log_activity("Invoice updated", f"Invoice: {existing['invoiceNumber']} (ID: {invoice_id})")
 
     return jsonify({"message": "Invoice updated successfully"}), 200
 
 
 def _log_activity(action, details):
-    """Log invoice-related activities."""
     from pymongo import MongoClient
-    from config import MONGO_URI, DB_NAME
+
+    from config import DB_NAME, MONGO_URI
 
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
-    db["logs"].insert_one({
-        "action": action,
-        "details": details,
-        "timestamp": datetime.now(timezone.utc),
-    })
+    db["logs"].insert_one(
+        {
+            "action": action,
+            "details": details,
+            "timestamp": datetime.now(timezone.utc),
+        }
+    )

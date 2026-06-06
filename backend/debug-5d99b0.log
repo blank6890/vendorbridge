@@ -1,0 +1,3 @@
+{"sessionId": "5d99b0", "hypothesisId": "RBAC", "location": "rbac.py:wrapped", "message": "access denied", "data": {"path": "/api/approvals/approve/507f1f77bcf86cd799439011", "role": "vendor", "allowed": ["manager"]}, "timestamp": 1780739507042}
+{"sessionId": "5d99b0", "hypothesisId": "RBAC", "location": "rbac.py:wrapped", "message": "access denied", "data": {"path": "/api/admin/users", "role": "vendor", "allowed": ["admin"]}, "timestamp": 1780739507043}
+{"sessionId": "5d99b0", "hypothesisId": "RBAC", "location": "rbac.py:wrapped", "message": "access denied", "data": {"path": "/logs", "role": "vendor", "allowed": ["admin"]}, "timestamp": 1780739507044}

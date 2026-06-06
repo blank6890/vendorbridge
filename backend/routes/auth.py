@@ -1,54 +1,121 @@
-from flask import Blueprint, request, jsonify
-from datetime import datetime, timezone
+import json
+import os
+import time
+from datetime import datetime, timedelta, timezone
+
 import bcrypt
 import jwt
-from config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRY_HOURS
+from flask import Blueprint, jsonify, request
+
+from config import JWT_ALGORITHM, JWT_EXPIRY_HOURS, JWT_SECRET
 from models.user import get_user_collection
-from datetime import timedelta
 
 auth_bp = Blueprint("auth", __name__)
+
+PUBLIC_REGISTRATION_ROLES = frozenset({"officer", "vendor", "manager"})
+DEBUG_LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "debug-5d99b0.log")
+
+FRONTEND_ROLE_MAP = {
+    "Procurement Officer": "officer",
+    "Manager": "manager",
+    "Vendor": "vendor",
+    "Admin": "admin",
+}
+
+
+def _agent_log(hypothesis_id, location, message, data=None):
+    # #region agent log
+    try:
+        with open(DEBUG_LOG_PATH, "a", encoding="utf-8") as log_file:
+            log_file.write(
+                json.dumps(
+                    {
+                        "sessionId": "5d99b0",
+                        "hypothesisId": hypothesis_id,
+                        "location": location,
+                        "message": message,
+                        "data": data or {},
+                        "timestamp": int(time.time() * 1000),
+                    }
+                )
+                + "\n"
+            )
+    except OSError:
+        pass
+    # #endregion
+
+
+def _resolve_registration_role(data, users):
+    """First user becomes admin; otherwise only non-admin roles with pending status."""
+    if users.count_documents({}) == 0:
+        _agent_log("REG", "auth.py:_resolve_registration_role", "first user -> admin", {})
+        return "admin", "approved"
+
+    requested = data.get("role", "vendor")
+    if requested in FRONTEND_ROLE_MAP:
+        requested = FRONTEND_ROLE_MAP[requested]
+
+    if requested == "admin" or requested not in PUBLIC_REGISTRATION_ROLES:
+        _agent_log(
+            "REG",
+            "auth.py:_resolve_registration_role",
+            "admin self-registration blocked",
+            {"requested": requested},
+        )
+        return None, None
+
+    return requested, "pending"
 
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    """Register a new user with hashed password."""
-    data = request.get_json()
+    """Register a new user. First user is admin; others require admin approval."""
+    data = request.get_json() or {}
 
-    required = ["name", "email", "password", "role"]
+    if "name" not in data and "firstName" in data:
+        data["name"] = f"{data.get('firstName', '').strip()} {data.get('lastName', '').strip()}".strip()
+
+    required = ["name", "email", "password"]
     for field in required:
-        if field not in data:
+        if not data.get(field):
             return jsonify({"error": f"'{field}' is required"}), 400
-
-    valid_roles = ["admin", "officer", "vendor", "manager"]
-    if data["role"] not in valid_roles:
-        return jsonify({"error": f"Role must be one of {valid_roles}"}), 400
 
     users = get_user_collection()
 
-    # Check if user already exists
     if users.find_one({"email": data["email"]}):
         return jsonify({"error": "Email already registered"}), 409
 
-    # Hash password
+    role, status = _resolve_registration_role(data, users)
+    if role is None:
+        return jsonify({"error": "Cannot self-register as admin"}), 403
+
     hashed = bcrypt.hashpw(data["password"].encode("utf-8"), bcrypt.gensalt())
 
     user = {
         "name": data["name"],
         "email": data["email"],
         "password": hashed.decode("utf-8"),
-        "role": data["role"],
+        "role": role,
+        "status": status,
         "created_at": datetime.now(timezone.utc),
     }
 
+    if data.get("phone"):
+        user["phone"] = data["phone"]
+    if data.get("country"):
+        user["country"] = data["country"]
+
     result = users.insert_one(user)
+    _log_activity("User registered", f"{data['name']} ({role}, {status})")
 
-    # Log activity
-    _log_activity("User registered", f"{data['name']} ({data['role']})")
-
-    return jsonify({
-        "message": "User registered successfully",
-        "userId": str(result.inserted_id),
-    }), 201
+    return jsonify(
+        {
+            "message": "User registered successfully",
+            "userId": str(result.inserted_id),
+            "role": role,
+            "status": status,
+        }
+    ), 201
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -65,11 +132,17 @@ def login():
     if not user:
         return jsonify({"error": "Invalid email or password"}), 401
 
-    # Verify password
     if not bcrypt.checkpw(data["password"].encode("utf-8"), user["password"].encode("utf-8")):
         return jsonify({"error": "Invalid email or password"}), 401
 
-    # Generate JWT
+    status = user.get("status", "approved")
+    if status == "disabled":
+        return jsonify({"error": "Account is disabled"}), 403
+    if status == "pending":
+        return jsonify({"error": "Account pending admin approval"}), 403
+    if status == "rejected":
+        return jsonify({"error": "Account registration was rejected"}), 403
+
     payload = {
         "userId": str(user["_id"]),
         "email": user["email"],
@@ -79,30 +152,35 @@ def login():
     }
 
     token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
     _log_activity("User login", f"{user['name']} ({user['role']})")
 
-    return jsonify({
-        "message": "Login successful",
-        "token": token,
-        "user": {
-            "id": str(user["_id"]),
-            "name": user["name"],
-            "email": user["email"],
-            "role": user["role"],
-        },
-    }), 200
+    return jsonify(
+        {
+            "message": "Login successful",
+            "token": token,
+            "user": {
+                "id": str(user["_id"]),
+                "name": user["name"],
+                "email": user["email"],
+                "role": user["role"],
+                "status": status,
+            },
+        }
+    ), 200
 
 
 def _log_activity(action, details):
     """Helper to log auth activities."""
     from pymongo import MongoClient
-    from config import MONGO_URI, DB_NAME
+
+    from config import DB_NAME, MONGO_URI
 
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
-    db["logs"].insert_one({
-        "action": action,
-        "details": details,
-        "timestamp": datetime.now(timezone.utc),
-    })
+    db["logs"].insert_one(
+        {
+            "action": action,
+            "details": details,
+            "timestamp": datetime.now(timezone.utc),
+        }
+    )

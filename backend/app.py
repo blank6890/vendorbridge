@@ -1,41 +1,43 @@
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from functools import wraps
-import jwt
-from config import JWT_SECRET, JWT_ALGORITHM
+import os
 
-# Import blueprints
-from routes.auth import auth_bp
-from routes.vendors import vendors_bp
-from routes.rfq import rfq_bp
-from routes.quotations import quotations_bp
+import jwt
+from flask import Flask, jsonify, request
+from flask_cors import CORS
+
+from config import FLASK_DEBUG, JWT_ALGORITHM, JWT_SECRET
+
+from routes.admin import admin_bp
 from routes.approvals import approvals_bp
-from routes.purchase_orders import purchase_orders_bp
+from routes.auth import auth_bp
 from routes.invoices import invoices_bp
+from routes.purchase_orders import purchase_orders_bp
+from routes.quotations import quotations_bp
+from routes.reports import reports_bp
+from routes.rfq import rfq_bp
+from routes.vendors import vendors_bp
+from utils.rbac import require_roles
 
 app = Flask(__name__)
 
-# CORS — allow React dev server on localhost:5173
-CORS(app, origins=[
+_cors_origins = [
     "http://localhost:5173",
-    "https://https://vendorbridge-410c.onrender.com"
-])
+    os.getenv("FRONTEND_URL", ""),
+    "https://vendorbridge-410c.onrender.com",
+]
+CORS(app, origins=[origin for origin in _cors_origins if origin])
 
-# ─── JWT Middleware ───────────────────────────────────────────────────────────
-
-# Routes that do NOT require authentication
-PUBLIC_ROUTES = [
+PUBLIC_ROUTES = {
     "/",
     "/api/auth/login",
-    "/api/auth/register"
-]
+    "/api/auth/register",
+}
 
 
 @app.before_request
 def jwt_middleware():
     """Verify JWT token on all routes except public ones."""
     if request.method == "OPTIONS":
-        return None  # Allow CORS preflight
+        return None
 
     if request.path in PUBLIC_ROUTES:
         return None
@@ -51,7 +53,7 @@ def jwt_middleware():
     token = parts[1]
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        request.user = payload  # Attach user info to request
+        request.user = payload
     except jwt.ExpiredSignatureError:
         return jsonify({"error": "Token has expired"}), 401
     except jwt.InvalidTokenError:
@@ -60,13 +62,13 @@ def jwt_middleware():
     return None
 
 
-# ─── Logs Route ───────────────────────────────────────────────────────────────
-
 @app.route("/logs", methods=["GET"])
+@require_roles("admin")
 def get_logs():
-    """Return all activity logs, most recent first."""
+    """Return all activity logs, most recent first (admin only)."""
     from pymongo import MongoClient
-    from config import MONGO_URI, DB_NAME
+
+    from config import DB_NAME, MONGO_URI
 
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
@@ -80,29 +82,28 @@ def get_logs():
     return jsonify(logs), 200
 
 
-# ─── Health Check ─────────────────────────────────────────────────────────────
-
 @app.route("/", methods=["GET"])
 def health_check():
     """Health check endpoint."""
-    return jsonify({
-        "status": "running",
-        "app": "VendorBridge API",
-        "version": "1.0.0",
-    }), 200
+    return jsonify(
+        {
+            "status": "running",
+            "app": "VendorBridge API",
+            "version": "1.0.0",
+        }
+    ), 200
 
-
-# ─── Register Blueprints ─────────────────────────────────────────────────────
 
 app.register_blueprint(auth_bp, url_prefix="/api/auth")
+app.register_blueprint(admin_bp, url_prefix="/api/admin")
 app.register_blueprint(vendors_bp, url_prefix="/api/vendors")
 app.register_blueprint(rfq_bp, url_prefix="/api/rfq")
 app.register_blueprint(quotations_bp, url_prefix="/api/quotations")
 app.register_blueprint(approvals_bp, url_prefix="/api/approvals")
 app.register_blueprint(purchase_orders_bp, url_prefix="/api/purchase-orders")
 app.register_blueprint(invoices_bp, url_prefix="/api/invoices")
+app.register_blueprint(reports_bp, url_prefix="/api/reports")
 
-# ─── Error Handlers ──────────────────────────────────────────────────────────
 
 @app.errorhandler(404)
 def not_found(e):
@@ -114,11 +115,9 @@ def internal_error(e):
     return jsonify({"error": "Internal server error"}), 500
 
 
-# ─── Run ──────────────────────────────────────────────────────────────────────
-
 if __name__ == "__main__":
     print("=" * 50)
     print("  VendorBridge API Server")
     print("  Running on http://localhost:5000")
     print("=" * 50)
-    app.run(debug=True, port=5000)
+    app.run(debug=FLASK_DEBUG, port=5000)

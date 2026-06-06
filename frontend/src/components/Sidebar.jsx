@@ -21,15 +21,15 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["Admin", "Officer", "Manager", "Vendor"] },
+  { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["Admin", "Procurement Officer", "Manager", "Vendor"] },
   { label: "User Management", path: "/admin/users", icon: UsersRound, roles: ["Admin"] },
-  { label: "Vendors", path: "/vendors", icon: Users, roles: ["Admin", "Officer"] },
-  { label: "RFQs", path: "/rfq", icon: FileText, roles: ["Admin", "Officer", "Vendor"] },
-  { label: "Quotations", path: "/quotations", icon: Scale, roles: ["Admin", "Officer", "Manager", "Vendor"] },
+  { label: "Vendors", path: "/vendors", icon: Users, roles: ["Admin", "Procurement Officer"] },
+  { label: "RFQs", path: "/rfq", icon: FileText, roles: ["Admin", "Procurement Officer", "Vendor"] },
+  { label: "Quotations", path: "/quotations", icon: Scale, roles: ["Admin", "Procurement Officer", "Manager", "Vendor"] },
   { label: "Approvals", path: "/approvals", icon: Package, roles: ["Manager"] },
-  { label: "Purchase Orders", path: "/purchase-orders", icon: ShoppingCart, roles: ["Admin", "Officer", "Manager", "Vendor"] },
-  { label: "Invoices", path: "/invoices", icon: Receipt, roles: ["Admin", "Officer", "Manager", "Vendor"] },
-  { label: "Reports", path: "/analytics", icon: BarChart3, roles: ["Admin", "Officer", "Manager"] },
+  { label: "Purchase Orders", path: "/purchase-orders", icon: ShoppingCart, roles: ["Admin", "Procurement Officer", "Manager", "Vendor"] },
+  { label: "Invoices", path: "/invoices", icon: Receipt, roles: ["Admin", "Procurement Officer", "Manager", "Vendor"] },
+  { label: "Reports", path: "/analytics", icon: BarChart3, roles: ["Admin", "Procurement Officer", "Manager"] },
   { label: "Activity Logs", path: "/activity", icon: Activity, roles: ["Admin"] },
 ];
 

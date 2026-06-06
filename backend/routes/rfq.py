@@ -1,18 +1,21 @@
-from flask import Blueprint, request, jsonify
 from datetime import datetime, timezone
+
 from bson import ObjectId
+from flask import Blueprint, jsonify, request
+
 from models.rfq import get_rfq_collection
+from utils.rbac import require_roles
 
 rfq_bp = Blueprint("rfq", __name__)
 
 
 def _serialize_rfq(rfq):
-    """Convert MongoDB RFQ document to JSON-safe dict."""
     rfq["_id"] = str(rfq["_id"])
     return rfq
 
 
-@rfq_bp.route("/rfq", methods=["GET"])
+@rfq_bp.route("/", strict_slashes=False, methods=["GET"])
+@require_roles("officer", "manager", "vendor")
 def list_rfqs():
     """List all RFQs with optional status filter."""
     rfqs = get_rfq_collection()
@@ -26,7 +29,8 @@ def list_rfqs():
     return jsonify([_serialize_rfq(r) for r in result]), 200
 
 
-@rfq_bp.route("/rfq", methods=["POST"])
+@rfq_bp.route("/", strict_slashes=False, methods=["POST"])
+@require_roles("officer")
 def create_rfq():
     """Create a new Request for Quotation."""
     data = request.get_json()
@@ -36,7 +40,6 @@ def create_rfq():
         if field not in data:
             return jsonify({"error": f"'{field}' is required"}), 400
 
-    # Validate items structure
     if not isinstance(data["items"], list) or len(data["items"]) == 0:
         return jsonify({"error": "'items' must be a non-empty array"}), 400
 
@@ -45,9 +48,7 @@ def create_rfq():
             return jsonify({"error": "Each item must have 'product' and 'qty'"}), 400
 
     rfqs = get_rfq_collection()
-
-    # Get createdBy from JWT payload (set by middleware)
-    created_by = request.user.get("userId", "unknown") if hasattr(request, "user") else "unknown"
+    created_by = request.user.get("userId", "unknown")
 
     rfq = {
         "title": data["title"],
@@ -60,16 +61,18 @@ def create_rfq():
     }
 
     result = rfqs.insert_one(rfq)
-
     _log_activity("RFQ created", f"{data['title']} (ID: {result.inserted_id})")
 
-    return jsonify({
-        "message": "RFQ created successfully",
-        "rfqId": str(result.inserted_id),
-    }), 201
+    return jsonify(
+        {
+            "message": "RFQ created successfully",
+            "rfqId": str(result.inserted_id),
+        }
+    ), 201
 
 
-@rfq_bp.route("/rfq/<rfq_id>", methods=["GET"])
+@rfq_bp.route("/<rfq_id>", strict_slashes=False, methods=["GET"])
+@require_roles("officer", "manager", "vendor")
 def get_rfq(rfq_id):
     """Get a single RFQ by ID."""
     rfqs = get_rfq_collection()
@@ -86,7 +89,8 @@ def get_rfq(rfq_id):
     return jsonify(_serialize_rfq(rfq)), 200
 
 
-@rfq_bp.route("/rfq/<rfq_id>", methods=["PUT"])
+@rfq_bp.route("/<rfq_id>", strict_slashes=False, methods=["PUT"])
+@require_roles("officer")
 def update_rfq(rfq_id):
     """Update an existing RFQ."""
     data = request.get_json()
@@ -111,21 +115,22 @@ def update_rfq(rfq_id):
 
     update_fields["updated_at"] = datetime.now(timezone.utc)
     rfqs.update_one({"_id": obj_id}, {"$set": update_fields})
-
     _log_activity("RFQ updated", f"{existing['title']} (ID: {rfq_id})")
 
     return jsonify({"message": "RFQ updated successfully"}), 200
 
 
 def _log_activity(action, details):
-    """Log RFQ-related activities."""
     from pymongo import MongoClient
-    from config import MONGO_URI, DB_NAME
+
+    from config import DB_NAME, MONGO_URI
 
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
-    db["logs"].insert_one({
-        "action": action,
-        "details": details,
-        "timestamp": datetime.now(timezone.utc),
-    })
+    db["logs"].insert_one(
+        {
+            "action": action,
+            "details": details,
+            "timestamp": datetime.now(timezone.utc),
+        }
+    )

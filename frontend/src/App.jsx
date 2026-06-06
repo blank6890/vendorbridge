@@ -79,7 +79,7 @@ export default function App() {
             <Route
               path="dashboard"
               element={
-                <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
+                <ProtectedRoute roles={["Admin", "Procurement Officer", "Manager", "Vendor"]}>
                   <Dashboard />
                 </ProtectedRoute>
               }
@@ -100,7 +100,7 @@ export default function App() {
             <Route
               path="vendors"
               element={
-                <ProtectedRoute roles={["Admin", "Officer"]}>
+                <ProtectedRoute roles={["Admin", "Procurement Officer"]}>
                   <Vendors />
                 </ProtectedRoute>
               }
@@ -109,7 +109,7 @@ export default function App() {
             <Route
               path="rfq"
               element={
-                <ProtectedRoute roles={["Admin", "Officer", "Vendor"]}>
+                <ProtectedRoute roles={["Admin", "Procurement Officer", "Vendor"]}>
                   <RFQ />
                 </ProtectedRoute>
               }
@@ -118,7 +118,7 @@ export default function App() {
             <Route
               path="quotations"
               element={
-                <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
+                <ProtectedRoute roles={["Admin", "Procurement Officer", "Manager", "Vendor"]}>
                   <Quotations />
                 </ProtectedRoute>
               }
@@ -136,7 +136,7 @@ export default function App() {
             <Route
               path="purchase-orders"
               element={
-                <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
+                <ProtectedRoute roles={["Admin", "Procurement Officer", "Manager", "Vendor"]}>
                   <PurchaseOrders />
                 </ProtectedRoute>
               }
@@ -145,7 +145,7 @@ export default function App() {
             <Route
               path="invoices"
               element={
-                <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
+                <ProtectedRoute roles={["Admin", "Procurement Officer", "Manager", "Vendor"]}>
                   <Invoices />
                 </ProtectedRoute>
               }
@@ -154,7 +154,7 @@ export default function App() {
             <Route
               path="analytics"
               element={
-                <ProtectedRoute roles={["Admin", "Officer", "Manager"]}>
+                <ProtectedRoute roles={["Admin", "Procurement Officer", "Manager"]}>
                   <PagePlaceholder title="Reports & Analytics" description="Implement in pages/Analytics.jsx" />
                 </ProtectedRoute>
               }

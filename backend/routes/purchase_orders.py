@@ -1,18 +1,21 @@
-from flask import Blueprint, request, jsonify
 from datetime import datetime, timezone
+
 from bson import ObjectId
-from models.purchase_order import get_po_collection, get_next_po_number
+from flask import Blueprint, jsonify, request
+
+from models.purchase_order import get_next_po_number, get_po_collection
+from utils.rbac import require_roles
 
 purchase_orders_bp = Blueprint("purchase_orders", __name__)
 
 
 def _serialize_po(po):
-    """Convert MongoDB PO document to JSON-safe dict."""
     po["_id"] = str(po["_id"])
     return po
 
 
-@purchase_orders_bp.route("/purchase-orders", methods=["GET"])
+@purchase_orders_bp.route("/", strict_slashes=False, methods=["GET"])
+@require_roles("officer", "manager", "vendor")
 def list_purchase_orders():
     """List all purchase orders with optional filters."""
     po_collection = get_po_collection()
@@ -29,7 +32,8 @@ def list_purchase_orders():
     return jsonify([_serialize_po(po) for po in result]), 200
 
 
-@purchase_orders_bp.route("/purchase-orders", methods=["POST"])
+@purchase_orders_bp.route("/", strict_slashes=False, methods=["POST"])
+@require_roles("officer")
 def create_purchase_order():
     """Manually create a purchase order."""
     data = request.get_json()
@@ -54,17 +58,19 @@ def create_purchase_order():
     }
 
     result = po_collection.insert_one(po)
-
     _log_activity("PO created manually", f"PO: {po_number}, Vendor: {data['vendorId']}")
 
-    return jsonify({
-        "message": "Purchase order created successfully",
-        "poId": str(result.inserted_id),
-        "poNumber": po_number,
-    }), 201
+    return jsonify(
+        {
+            "message": "Purchase order created successfully",
+            "poId": str(result.inserted_id),
+            "poNumber": po_number,
+        }
+    ), 201
 
 
-@purchase_orders_bp.route("/purchase-orders/<po_id>", methods=["PUT"])
+@purchase_orders_bp.route("/<po_id>", strict_slashes=False, methods=["PUT"])
+@require_roles("officer")
 def update_purchase_order(po_id):
     """Update a purchase order status."""
     data = request.get_json()
@@ -89,21 +95,22 @@ def update_purchase_order(po_id):
 
     update_fields["updated_at"] = datetime.now(timezone.utc)
     po_collection.update_one({"_id": obj_id}, {"$set": update_fields})
-
     _log_activity("PO updated", f"PO: {existing['poNumber']} (ID: {po_id})")
 
     return jsonify({"message": "Purchase order updated successfully"}), 200
 
 
 def _log_activity(action, details):
-    """Log PO-related activities."""
     from pymongo import MongoClient
-    from config import MONGO_URI, DB_NAME
+
+    from config import DB_NAME, MONGO_URI
 
     client = MongoClient(MONGO_URI)
     db = client[DB_NAME]
-    db["logs"].insert_one({
-        "action": action,
-        "details": details,
-        "timestamp": datetime.now(timezone.utc),
-    })
+    db["logs"].insert_one(
+        {
+            "action": action,
+            "details": details,
+            "timestamp": datetime.now(timezone.utc),
+        }
+    )
