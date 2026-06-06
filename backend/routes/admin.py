@@ -22,7 +22,7 @@ def _serialize_user(user):
 @admin_bp.route("/users", strict_slashes=False, methods=["GET"])
 @require_roles("admin")
 def list_users():
-    """List all users (admin only). Supports ?role= filter."""
+    """List all users (Company Admin only). Supports ?role= and ?status= filters."""
     users = get_user_collection()
     role = request.args.get("role")
     status = request.args.get("status")
@@ -40,7 +40,7 @@ def list_users():
 @admin_bp.route("/users/<user_id>", strict_slashes=False, methods=["PUT"])
 @require_roles("admin")
 def update_user(user_id):
-    """Update user details (admin only)."""
+    """Update user details (Company Admin only)."""
     data = request.get_json()
     users = get_user_collection()
 
@@ -65,7 +65,7 @@ def update_user(user_id):
 
     update_fields["updated_at"] = datetime.now(timezone.utc)
     users.update_one({"_id": obj_id}, {"$set": update_fields})
-    _log_activity("User updated by admin", f"User: {existing['name']} (ID: {user_id})")
+    _log_activity("User updated by Company Admin", f"User: {existing['name']} (ID: {user_id})")
 
     return jsonify({"message": "User updated successfully"}), 200
 
@@ -73,7 +73,7 @@ def update_user(user_id):
 @admin_bp.route("/users/<user_id>/disable", strict_slashes=False, methods=["PUT"])
 @require_roles("admin")
 def disable_user(user_id):
-    """Disable a user account (admin only)."""
+    """Disable a user account (Company Admin only)."""
     users = get_user_collection()
 
     try:
@@ -89,7 +89,7 @@ def disable_user(user_id):
         {"_id": obj_id},
         {"$set": {"status": "disabled", "updated_at": datetime.now(timezone.utc)}},
     )
-    _log_activity("User disabled", f"User: {existing['name']} (ID: {user_id})")
+    _log_activity("User disabled by Company Admin", f"User: {existing['name']} (ID: {user_id})")
 
     return jsonify({"message": f"User '{existing['name']}' has been disabled"}), 200
 
@@ -97,7 +97,9 @@ def disable_user(user_id):
 @admin_bp.route("/users/<user_id>/approve", strict_slashes=False, methods=["PUT"])
 @require_roles("admin")
 def approve_user(user_id):
-    """Approve a user account (admin only)."""
+    """Approve a Procurement Officer or Manager registration (Company Admin only).
+    Vendor accounts are verified through the platform verification process.
+    """
     users = get_user_collection()
 
     try:
@@ -109,11 +111,17 @@ def approve_user(user_id):
     if not existing:
         return jsonify({"error": "User not found"}), 404
 
+    if existing.get("status") != "pending":
+        return jsonify({"error": f"User is not pending approval (current status: {existing.get('status')})"}), 400
+
     users.update_one(
         {"_id": obj_id},
         {"$set": {"status": "approved", "updated_at": datetime.now(timezone.utc)}},
     )
-    _log_activity("User approved", f"User: {existing['name']} (ID: {user_id})")
+    _log_activity(
+        "User approved by Company Admin",
+        f"User: {existing['name']} ({existing.get('role')}) (ID: {user_id})",
+    )
 
     return jsonify({"message": f"User '{existing['name']}' has been approved"}), 200
 
@@ -121,8 +129,16 @@ def approve_user(user_id):
 @admin_bp.route("/users/<user_id>/reject", strict_slashes=False, methods=["PUT"])
 @require_roles("admin")
 def reject_user(user_id):
-    """Reject a user account (admin only)."""
+    """Reject a user registration (Company Admin only).
+    A rejection reason is required and recorded per hei.txt policy.
+    """
+    data = request.get_json() or {}
     users = get_user_collection()
+
+    # Per hei.txt: "a valid reason must be provided and recorded in the system"
+    reason = (data.get("reason") or "").strip()
+    if not reason:
+        return jsonify({"error": "A rejection reason is required and must be recorded"}), 400
 
     try:
         obj_id = ObjectId(user_id)
@@ -133,13 +149,25 @@ def reject_user(user_id):
     if not existing:
         return jsonify({"error": "User not found"}), 404
 
+    if existing.get("status") != "pending":
+        return jsonify({"error": f"User is not pending approval (current status: {existing.get('status')})"}), 400
+
     users.update_one(
         {"_id": obj_id},
-        {"$set": {"status": "rejected", "updated_at": datetime.now(timezone.utc)}},
+        {
+            "$set": {
+                "status": "rejected",
+                "rejection_reason": reason,
+                "updated_at": datetime.now(timezone.utc),
+            }
+        },
     )
-    _log_activity("User rejected", f"User: {existing['name']} (ID: {user_id})")
+    _log_activity(
+        "User rejected by Company Admin",
+        f"User: {existing['name']} ({existing.get('role')}) (ID: {user_id}) — Reason: {reason}",
+    )
 
-    return jsonify({"message": f"User '{existing['name']}' has been rejected"}), 200
+    return jsonify({"message": f"User '{existing['name']}' has been rejected", "reason": reason}), 200
 
 
 def _log_activity(action, details):

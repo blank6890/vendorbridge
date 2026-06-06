@@ -19,6 +19,7 @@ FRONTEND_ROLE_MAP = {
     "Procurement Officer": "officer",
     "Manager": "manager",
     "Vendor": "vendor",
+    "Company Admin": "admin",
     "Admin": "admin",
 }
 
@@ -46,30 +47,46 @@ def _agent_log(hypothesis_id, location, message, data=None):
 
 
 def _resolve_registration_role(data, users):
-    """First user becomes admin; otherwise only non-admin roles with pending status."""
-    if users.count_documents({}) == 0:
-        _agent_log("REG", "auth.py:_resolve_registration_role", "first user -> admin", {})
-        return "admin", "approved"
-
+    """First user becomes admin (approved).
+    Subsequent admin/Company Admin registrations go pending for email verification.
+    Officers and Managers go pending for Company Admin approval.
+    Vendors go pending for platform verification.
+    """
     requested = data.get("role", "vendor")
     if requested in FRONTEND_ROLE_MAP:
         requested = FRONTEND_ROLE_MAP[requested]
 
-    if requested == "admin" or requested not in PUBLIC_REGISTRATION_ROLES:
+    # First user on the platform becomes admin immediately
+    if users.count_documents({}) == 0:
+        _agent_log("REG", "auth.py:_resolve_registration_role", "first user -> admin", {})
+        return "admin", "approved"
+
+    if requested == "admin":
+        # Subsequent Company Admin registrations require email verification
         _agent_log(
             "REG",
             "auth.py:_resolve_registration_role",
-            "admin self-registration blocked",
-            {"requested": requested},
+            "company admin registration -> pending email verification",
+            {},
         )
+        return "admin", "pending"
+
+    if requested not in PUBLIC_REGISTRATION_ROLES:
         return None, None
 
+    # Officers and Managers: pending Company Admin approval
+    # Vendors: pending platform verification
     return requested, "pending"
 
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
-    """Register a new user. First user is admin; others require admin approval."""
+    """Register a new user.
+    - First user: auto-approved admin.
+    - Company Admin: pending email/document verification (3 working days).
+    - Officer / Manager: pending Company Admin approval.
+    - Vendor: pending platform verification (3 working days).
+    """
     data = request.get_json() or {}
 
     if "name" not in data and "firstName" in data:
@@ -87,7 +104,7 @@ def register():
 
     role, status = _resolve_registration_role(data, users)
     if role is None:
-        return jsonify({"error": "Cannot self-register as admin"}), 403
+        return jsonify({"error": "Invalid role"}), 403
 
     hashed = bcrypt.hashpw(data["password"].encode("utf-8"), bcrypt.gensalt())
 
@@ -104,13 +121,34 @@ def register():
         user["phone"] = data["phone"]
     if data.get("country"):
         user["country"] = data["country"]
+    if data.get("company"):
+        user["company"] = data["company"]
 
     result = users.insert_one(user)
+
+    # Descriptive pending message per role
+    pending_messages = {
+        "admin": (
+            "Registration received. We will send an email requesting documents to verify "
+            "you are an authorized company representative. Verification takes up to 3 working days."
+        ),
+        "vendor": (
+            "Registration received. We will send an email requesting business documents for "
+            "platform verification. This takes up to 3 working days."
+        ),
+        "officer": "Registration received. Awaiting Company Admin approval.",
+        "manager": "Registration received. Awaiting Company Admin approval.",
+    }
+
+    message = "User registered successfully"
+    if status == "pending":
+        message = pending_messages.get(role, "Registration received. Awaiting approval.")
+
     _log_activity("User registered", f"{data['name']} ({role}, {status})")
 
     return jsonify(
         {
-            "message": "User registered successfully",
+            "message": message,
             "userId": str(result.inserted_id),
             "role": role,
             "status": status,
@@ -139,9 +177,19 @@ def login():
     if status == "disabled":
         return jsonify({"error": "Account is disabled"}), 403
     if status == "pending":
-        return jsonify({"error": "Account pending admin approval"}), 403
+        role = user.get("role", "")
+        if role == "admin":
+            return jsonify({"error": "Account pending verification. Check your email for document requirements."}), 403
+        elif role == "vendor":
+            return jsonify({"error": "Account pending platform verification. Check your email for document requirements."}), 403
+        else:
+            return jsonify({"error": "Account pending Company Admin approval"}), 403
     if status == "rejected":
-        return jsonify({"error": "Account registration was rejected"}), 403
+        reason = user.get("rejection_reason", "")
+        msg = "Account registration was rejected"
+        if reason:
+            msg += f": {reason}"
+        return jsonify({"error": msg}), 403
 
     payload = {
         "userId": str(user["_id"]),
