@@ -1,122 +1,177 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState } from "react";
+import { BrowserRouter, Navigate, Outlet, Route, Routes } from "react-router-dom";
+import { AuthProvider } from "@/context/AuthContext";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import Navbar from "@/components/Navbar";
+import Sidebar from "@/components/Sidebar";
+import PagePlaceholder from "@/components/PagePlaceholder";
 
-function App() {
-  const [count, setCount] = useState(0)
+function AppShell() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+    <div className="flex min-h-screen bg-background">
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onCollapsedChange={setSidebarCollapsed}
+        mobileOpen={mobileOpen}
+        onMobileOpenChange={setMobileOpen}
+      />
+      <div className="flex min-h-screen flex-1 flex-col lg:min-w-0">
+        <Navbar
+          sidebarCollapsed={sidebarCollapsed}
+          onMenuClick={() => setMobileOpen((open) => !open)}
+        />
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
 }
 
-export default App
+function UnauthorizedPage() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-6">
+      <div className="vb-card max-w-md p-8 text-center">
+        <h1 className="text-2xl font-medium text-foreground">Unauthorized</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          You do not have permission to view this page.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route
+            path="/login"
+            element={
+              <PagePlaceholder
+                title="Login"
+                description="Implement in pages/Login.jsx"
+              />
+            }
+          />
+          <Route
+            path="/forgot-password"
+            element={
+              <PagePlaceholder
+                title="Forgot Password"
+                description="Implement in pages/ForgotPassword.jsx"
+              />
+            }
+          />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+          <Route element={<AppShell />}>
+            <Route index element={<Navigate to="/dashboard" replace />} />
+
+            <Route
+              path="dashboard"
+              element={
+                <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
+                  <PagePlaceholder title="Dashboard" description="Implement in pages/Dashboard.jsx" />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="admin/users"
+              element={
+                <ProtectedRoute roles={["Admin"]}>
+                  <PagePlaceholder
+                    title="User Management"
+                    description="Implement in pages/AdminUsers.jsx"
+                  />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="vendors"
+              element={
+                <ProtectedRoute roles={["Admin", "Officer"]}>
+                  <PagePlaceholder title="Vendors" description="Implement in pages/Vendors.jsx" />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="rfq"
+              element={
+                <ProtectedRoute roles={["Admin", "Officer", "Vendor"]}>
+                  <PagePlaceholder title="RFQs" description="Implement in pages/RFQ.jsx" />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="quotations"
+              element={
+                <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
+                  <PagePlaceholder title="Quotations" description="Implement in pages/Quotations.jsx" />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="approvals"
+              element={
+                <ProtectedRoute roles={["Manager"]}>
+                  <PagePlaceholder title="Approvals" description="Implement in pages/Approvals.jsx" />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="purchase-orders"
+              element={
+                <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
+                  <PagePlaceholder
+                    title="Purchase Orders"
+                    description="Implement in pages/PurchaseOrders.jsx"
+                  />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="invoices"
+              element={
+                <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
+                  <PagePlaceholder title="Invoices" description="Implement in pages/Invoices.jsx" />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="analytics"
+              element={
+                <ProtectedRoute roles={["Admin", "Officer", "Manager"]}>
+                  <PagePlaceholder title="Reports & Analytics" description="Implement in pages/Analytics.jsx" />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="activity"
+              element={
+                <ProtectedRoute roles={["Admin"]}>
+                  <PagePlaceholder title="Activity Logs" description="Implement in pages/ActivityLogs.jsx" />
+                </ProtectedRoute>
+              }
+            />
+          </Route>
+
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
+}
