@@ -23,6 +23,16 @@ FRONTEND_ROLE_MAP = {
     "Admin": "admin",
 }
 
+DEMO_LOGIN_ALIASES = {
+    "admin": "admin@vendorbridge.com",
+    "officer": "officer@vendorbridge.com",
+    "manager": "manager@vendorbridge.com",
+    "vendor": "vendor@vendorbridge.com",
+}
+DEMO_ACCOUNT_EMAILS = frozenset(DEMO_LOGIN_ALIASES.values())
+DEMO_PASSWORD = "password"
+LEGACY_DEMO_PASSWORD = "password123"
+
 
 def _agent_log(hypothesis_id, location, message, data=None):
     # #region agent log
@@ -77,6 +87,31 @@ def _resolve_registration_role(data, users):
     # Officers and Managers: pending Company Admin approval
     # Vendors: pending platform verification
     return requested, "pending"
+
+
+def _resolve_login_email(identifier):
+    identifier = (identifier or "").strip().lower()
+    return DEMO_LOGIN_ALIASES.get(identifier, identifier)
+
+
+def _password_matches(user, password, users):
+    password_hash = user.get("password", "")
+    if bcrypt.checkpw(password.encode("utf-8"), password_hash.encode("utf-8")):
+        return True
+
+    email = (user.get("email") or "").lower()
+    is_legacy_demo = (
+        email in DEMO_ACCOUNT_EMAILS
+        and password == DEMO_PASSWORD
+        and bcrypt.checkpw(LEGACY_DEMO_PASSWORD.encode("utf-8"), password_hash.encode("utf-8"))
+    )
+    if not is_legacy_demo:
+        return False
+
+    upgraded_hash = bcrypt.hashpw(DEMO_PASSWORD.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    users.update_one({"_id": user["_id"]}, {"$set": {"password": upgraded_hash}})
+    _agent_log("AUTH", "auth.py:_password_matches", "legacy demo password migrated", {"email": email})
+    return True
 
 
 @auth_bp.route("/register", methods=["POST"])
@@ -162,15 +197,16 @@ def login():
     data = request.get_json()
 
     if not data or "email" not in data or "password" not in data:
-        return jsonify({"error": "Email and password are required"}), 400
+        return jsonify({"error": "Email/username and password are required"}), 400
 
     users = get_user_collection()
-    user = users.find_one({"email": data["email"]})
+    login_email = _resolve_login_email(data["email"])
+    user = users.find_one({"email": login_email})
 
     if not user:
         return jsonify({"error": "Invalid email or password"}), 401
 
-    if not bcrypt.checkpw(data["password"].encode("utf-8"), user["password"].encode("utf-8")):
+    if not _password_matches(user, data["password"], users):
         return jsonify({"error": "Invalid email or password"}), 401
 
     status = user.get("status", "approved")

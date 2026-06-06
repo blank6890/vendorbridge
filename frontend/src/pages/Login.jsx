@@ -73,10 +73,10 @@ const SIGNUP_ROLES = [
 ];
 
 const DEMO_ACCOUNTS = [
-  { role: "Admin",               icon: ShieldCheck,  email: "admin@vendorbridge.com" },
-  { role: "Procurement Officer", icon: Briefcase,    email: "officer@vendorbridge.com" },
-  { role: "Manager",             icon: CheckCircle2, email: "manager@vendorbridge.com" },
-  { role: "Vendor",              icon: Truck,        email: "vendor@vendorbridge.com" },
+  { role: "Admin",               icon: ShieldCheck,  login: "admin" },
+  { role: "Procurement Officer", icon: Briefcase,    login: "officer" },
+  { role: "Manager",             icon: CheckCircle2, login: "manager" },
+  { role: "Vendor",              icon: Truck,        login: "vendor" },
 ];
 
 /* ══════════════════════════════════════════════════════════════════ */
@@ -123,7 +123,11 @@ export default function Login() {
       if (form.lastName.trim().length < 1)  err.lastName  = "Enter your last name";
       if (!/^\+?[\d\s\-()]{7,15}$/.test(form.phone)) err.phone = "Enter a valid phone number";
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) err.email = "Enter a valid email";
+    if (mode === "signin") {
+      if (!form.email.trim()) err.email = "Enter your email or username";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      err.email = "Enter a valid email";
+    }
     if (form.password.length < 6) err.password = "Minimum 6 characters";
     if (mode === "signup" && form.password !== form.confirm) err.confirm = "Passwords do not match";
     setErrors(err);
@@ -180,7 +184,7 @@ export default function Login() {
     setLoading(true);
     setBanner(null);
     try {
-      await login?.({ email: acc.email, password: "password123" });
+      await login?.({ email: acc.login, password: "password" });
       navigate("/dashboard");
     } catch (err) {
       setBanner({ type: "error", msg: err?.message || "Demo login failed." });
@@ -350,11 +354,11 @@ export default function Login() {
                 </>
               )}
 
-              <Field label="Email" error={errors.email} icon={Mail}>
+              <Field label={mode === "signin" ? "Email or username" : "Email"} error={errors.email} icon={Mail}>
                 <input
-                  type="email"
+                  type={mode === "signin" ? "text" : "email"}
                   className={`${inputBase} pl-10 ${errors.email ? "border-rose-300" : "border-slate-300 focus:border-emerald-500"}`}
-                  placeholder="you@company.com"
+                  placeholder={mode === "signin" ? "admin or you@company.com" : "you@company.com"}
                   value={form.email}
                   onChange={set("email")}
                 />
@@ -473,6 +477,7 @@ export default function Login() {
                   );
                 })}
               </div>
+              <p className="mt-2 text-center text-xs text-slate-400">Demo password: password</p>
             </div>
           </div>
         </main>
