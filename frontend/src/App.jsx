@@ -6,6 +6,17 @@ import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import PagePlaceholder from "@/components/PagePlaceholder";
 
+// Import real pages
+import Login from "@/pages/Login";
+import Dashboard from "@/pages/Dashboard";
+import Vendors from "@/pages/Vendors";
+import RFQ from "@/pages/RFQ";
+import Quotations from "@/pages/Quotations";
+import Approvals from "@/pages/Approvals";
+import PurchaseOrders from "@/pages/PurchaseOrders";
+import Invoices from "@/pages/Invoices";
+import ActivityLogs from "@/pages/ActivityLogs";
+
 function AppShell() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -49,15 +60,8 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route
-            path="/login"
-            element={
-              <PagePlaceholder
-                title="Login"
-                description="Implement in pages/Login.jsx"
-              />
-            }
-          />
+          <Route path="/login" element={<Login />} />
+          
           <Route
             path="/forgot-password"
             element={
@@ -76,7 +80,7 @@ export default function App() {
               path="dashboard"
               element={
                 <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
-                  <PagePlaceholder title="Dashboard" description="Implement in pages/Dashboard.jsx" />
+                  <Dashboard />
                 </ProtectedRoute>
               }
             />
@@ -97,7 +101,7 @@ export default function App() {
               path="vendors"
               element={
                 <ProtectedRoute roles={["Admin", "Officer"]}>
-                  <PagePlaceholder title="Vendors" description="Implement in pages/Vendors.jsx" />
+                  <Vendors />
                 </ProtectedRoute>
               }
             />
@@ -106,7 +110,7 @@ export default function App() {
               path="rfq"
               element={
                 <ProtectedRoute roles={["Admin", "Officer", "Vendor"]}>
-                  <PagePlaceholder title="RFQs" description="Implement in pages/RFQ.jsx" />
+                  <RFQ />
                 </ProtectedRoute>
               }
             />
@@ -115,7 +119,7 @@ export default function App() {
               path="quotations"
               element={
                 <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
-                  <PagePlaceholder title="Quotations" description="Implement in pages/Quotations.jsx" />
+                  <Quotations />
                 </ProtectedRoute>
               }
             />
@@ -124,7 +128,7 @@ export default function App() {
               path="approvals"
               element={
                 <ProtectedRoute roles={["Manager"]}>
-                  <PagePlaceholder title="Approvals" description="Implement in pages/Approvals.jsx" />
+                  <Approvals />
                 </ProtectedRoute>
               }
             />
@@ -133,10 +137,7 @@ export default function App() {
               path="purchase-orders"
               element={
                 <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
-                  <PagePlaceholder
-                    title="Purchase Orders"
-                    description="Implement in pages/PurchaseOrders.jsx"
-                  />
+                  <PurchaseOrders />
                 </ProtectedRoute>
               }
             />
@@ -145,7 +146,7 @@ export default function App() {
               path="invoices"
               element={
                 <ProtectedRoute roles={["Admin", "Officer", "Manager", "Vendor"]}>
-                  <PagePlaceholder title="Invoices" description="Implement in pages/Invoices.jsx" />
+                  <Invoices />
                 </ProtectedRoute>
               }
             />
@@ -163,7 +164,7 @@ export default function App() {
               path="activity"
               element={
                 <ProtectedRoute roles={["Admin"]}>
-                  <PagePlaceholder title="Activity Logs" description="Implement in pages/ActivityLogs.jsx" />
+                  <ActivityLogs />
                 </ProtectedRoute>
               }
             />

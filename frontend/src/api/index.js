@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL ?? "";
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
 
 function getToken() {
   try {
@@ -60,247 +60,248 @@ async function request(path, options = {}) {
 
 export const authAPI = {
   login: (email, password) =>
-    request("/auth/login", {
+    request("/api/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
 
   register: (name, email, password, role) =>
-    request("/auth/register", {
+    request("/api/auth/register", {
       method: "POST",
       body: JSON.stringify({ name, email, password, role }),
     }),
 
   forgotPassword: (email) =>
-    request("/auth/forgot-password", {
+    request("/api/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify({ email }),
     }),
 
   resetPassword: (token, password) =>
-    request("/auth/reset-password", {
+    request("/api/auth/reset-password", {
       method: "POST",
       body: JSON.stringify({ token, password }),
     }),
 };
 
 export const usersAPI = {
-  getAll: (params) => request(`/users${buildQuery(params)}`),
+  getAll: (params) => request(`/api/admin/users${buildQuery(params)}`),
 
-  getUsers: (params) => request(`/users${buildQuery(params)}`),
+  getUsers: (params) => request(`/api/admin/users${buildQuery(params)}`),
 
-  getById: (id) => request(`/users/${id}`),
+  getById: (id) => request(`/api/admin/users/${id}`),
 
   editUser: (id, data) =>
-    request(`/users/${id}`, {
+    request(`/api/admin/users/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
 
   disableUser: (id) =>
-    request(`/users/${id}/disable`, {
-      method: "PATCH",
+    request(`/api/admin/users/${id}/disable`, {
+      method: "PUT",
     }),
 
   approve: (id) =>
-    request(`/users/${id}/approve`, {
-      method: "PATCH",
+    request(`/api/admin/users/${id}/approve`, {
+      method: "PUT",
     }),
 };
 
 export const vendorsAPI = {
-  getAll: (params) => request(`/vendors${buildQuery(params)}`),
+  getAll: (params) => request(`/api/vendors${buildQuery(params)}`),
 
-  getById: (id) => request(`/vendors/${id}`),
+  getById: (id) => request(`/api/vendors/${id}`),
 
   create: (data) =>
-    request("/vendors", {
+    request("/api/vendors", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   update: (id, data) =>
-    request(`/vendors/${id}`, {
+    request(`/api/vendors/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
 
   delete: (id) =>
-    request(`/vendors/${id}`, {
+    request(`/api/vendors/${id}`, {
       method: "DELETE",
     }),
 
   setStatus: (id, status) =>
-    request(`/vendors/${id}/status`, {
-      method: "PATCH",
+    request(`/api/vendors/${id}`, {
+      method: "PUT",
       body: JSON.stringify({ status }),
     }),
 
   rateVendor: (id, rating) =>
-    request(`/vendors/${id}/rate`, {
-      method: "POST",
+    request(`/api/vendors/${id}/rate`, {
+      method: "PUT",
       body: JSON.stringify({ rating }),
     }),
 };
 
 export const rfqAPI = {
-  getAll: (params) => request(`/rfq${buildQuery(params)}`),
+  getAll: (params) => request(`/api/rfq${buildQuery(params)}`),
 
-  getById: (id) => request(`/rfq/${id}`),
+  getById: (id) => request(`/api/rfq/${id}`),
 
   create: (data) =>
-    request("/rfq", {
+    request("/api/rfq", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   update: (id, data) =>
-    request(`/rfq/${id}`, {
+    request(`/api/rfq/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
 
   delete: (id) =>
-    request(`/rfq/${id}`, {
+    request(`/api/rfq/${id}`, {
       method: "DELETE",
     }),
 
   assignVendors: (id, vendorIds) =>
-    request(`/rfq/${id}/assign`, {
-      method: "POST",
-      body: JSON.stringify({ vendorIds }),
+    request(`/api/rfq/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ assignedVendors: vendorIds }),
     }),
 
   close: (id) =>
-    request(`/rfq/${id}/close`, {
-      method: "PATCH",
+    request(`/api/rfq/${id}`, {
+      method: "PUT",
+      body: JSON.stringify({ status: "closed" }),
     }),
 };
 
 export const quotationsAPI = {
-  getAll: (params) => request(`/quotations${buildQuery(params)}`),
+  getAll: (params) => request(`/api/quotations${buildQuery(params)}`),
 
-  getById: (id) => request(`/quotations/${id}`),
+  getById: (id) => request(`/api/quotations/${id}`),
 
   submit: (data) =>
-    request("/quotations", {
+    request("/api/quotations", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   update: (id, data) =>
-    request(`/quotations/${id}`, {
+    request(`/api/quotations/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
 
   delete: (id) =>
-    request(`/quotations/${id}`, {
+    request(`/api/quotations/${id}`, {
       method: "DELETE",
     }),
 
   select: (id) =>
-    request(`/quotations/${id}/select`, {
-      method: "PATCH",
+    request(`/api/approvals/approve/${id}`, {
+      method: "POST",
     }),
 };
 
 export const approvalsAPI = {
-  getAll: (params) => request(`/approvals${buildQuery(params)}`),
+  getAll: (params) => request(`/api/quotations${buildQuery({...params, status: "pending"})}`),
 
-  getById: (id) => request(`/approvals/${id}`),
+  getById: (id) => request(`/api/quotations/${id}`),
 
   approve: (id, remarks) =>
-    request(`/approvals/${id}/approve`, {
-      method: "PATCH",
+    request(`/api/approvals/approve/${id}`, {
+      method: "POST",
       body: JSON.stringify({ remarks }),
     }),
 
   reject: (id, remarks) =>
-    request(`/approvals/${id}/reject`, {
-      method: "PATCH",
+    request(`/api/approvals/reject/${id}`, {
+      method: "POST",
       body: JSON.stringify({ remarks }),
     }),
 };
 
 export const purchaseOrdersAPI = {
-  getAll: (params) => request(`/purchase-orders${buildQuery(params)}`),
+  getAll: (params) => request(`/api/purchase-orders${buildQuery(params)}`),
 
-  getById: (id) => request(`/purchase-orders/${id}`),
+  getById: (id) => request(`/api/purchase-orders/${id}`),
 
   create: (data) =>
-    request("/purchase-orders", {
+    request("/api/purchase-orders", {
       method: "POST",
       body: JSON.stringify(data),
     }),
 
   update: (id, data) =>
-    request(`/purchase-orders/${id}`, {
+    request(`/api/purchase-orders/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
 
   setStatus: (id, status) =>
-    request(`/purchase-orders/${id}/status`, {
-      method: "PATCH",
+    request(`/api/purchase-orders/${id}`, {
+      method: "PUT",
       body: JSON.stringify({ status }),
     }),
 };
 
 export const invoicesAPI = {
-  getAll: (params) => request(`/invoices${buildQuery(params)}`),
+  getAll: (params) => request(`/api/invoices${buildQuery(params)}`),
 
-  getById: (id) => request(`/invoices/${id}`),
+  getById: (id) => request(`/api/invoices/${id}`),
 
   generate: (poId) =>
-    request("/invoices/generate", {
+    request("/api/invoices", {
       method: "POST",
       body: JSON.stringify({ poId }),
     }),
 
   update: (id, data) =>
-    request(`/invoices/${id}`, {
+    request(`/api/invoices/${id}`, {
       method: "PUT",
       body: JSON.stringify(data),
     }),
 
   sendEmail: (id, toEmail) =>
-    request(`/invoices/${id}/email`, {
+    request(`/api/invoices/${id}/email`, {
       method: "POST",
       body: JSON.stringify({ toEmail }),
     }),
 
   emailInvoice: (id, toEmail) =>
-    request(`/invoices/${id}/email`, {
+    request(`/api/invoices/${id}/email`, {
       method: "POST",
       body: JSON.stringify({ toEmail }),
     }),
 
   setStatus: (id, status) =>
-    request(`/invoices/${id}/status`, {
-      method: "PATCH",
+    request(`/api/invoices/${id}`, {
+      method: "PUT",
       body: JSON.stringify({ status }),
     }),
 };
 
 export const activityAPI = {
-  getAll: (params) => request(`/activity${buildQuery(params)}`),
+  getAll: (params) => request(`/logs${buildQuery(params)}`),
 };
 
 export const reportsAPI = {
-  getSummary: () => request("/reports/summary"),
+  getSummary: () => request("/api/reports/summary"),
 
   getMonthlyTrend: (year) =>
-    request(`/reports/monthly-trend${buildQuery({ year })}`),
+    request(`/api/reports/monthly-trend${buildQuery({ year })}`),
 
   getVendorPerformance: (params) =>
-    request(`/reports/vendor-performance${buildQuery(params)}`),
+    request(`/api/reports/vendor-performance${buildQuery(params)}`),
 
   getSpendingByCategory: (params) =>
-    request(`/reports/spending-by-category${buildQuery(params)}`),
+    request(`/api/reports/spending-by-category${buildQuery(params)}`),
 
   exportReports: (params) =>
-    request(`/reports/export${buildQuery(params)}`),
+    request(`/api/reports/export${buildQuery(params)}`),
 };
 
 // Convenience aliases matching the requested API surface
