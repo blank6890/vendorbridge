@@ -23,10 +23,10 @@ import { cn } from "@/lib/utils";
 const NAV_ITEMS = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard, roles: ["Admin", "Procurement Officer", "Manager", "Vendor"] },
   { label: "User Management", path: "/admin/users", icon: UsersRound, roles: ["Admin"] },
-  { label: "Vendors", path: "/vendors", icon: Users, roles: ["Admin", "Procurement Officer"] },
+  { label: "Vendors", path: "/vendors", icon: Users, roles: ["Admin", "Procurement Officer", "Manager"] },
   { label: "RFQs", path: "/rfq", icon: FileText, roles: ["Admin", "Procurement Officer", "Vendor"] },
   { label: "Quotations", path: "/quotations", icon: Scale, roles: ["Admin", "Procurement Officer", "Manager", "Vendor"] },
-  { label: "Approvals", path: "/approvals", icon: Package, roles: ["Manager"] },
+  { label: "Approvals", path: "/approvals", icon: Package, roles: ["Procurement Officer", "Manager"] },
   { label: "Purchase Orders", path: "/purchase-orders", icon: ShoppingCart, roles: ["Admin", "Procurement Officer", "Manager", "Vendor"] },
   { label: "Invoices", path: "/invoices", icon: Receipt, roles: ["Admin", "Procurement Officer", "Manager", "Vendor"] },
   { label: "Reports", path: "/analytics", icon: BarChart3, roles: ["Admin", "Procurement Officer", "Manager"] },
