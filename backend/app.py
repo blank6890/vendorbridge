@@ -16,7 +16,10 @@ from routes.invoices import invoices_bp
 app = Flask(__name__)
 
 # CORS — allow React dev server on localhost:5173
-CORS(app, resources={r"/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}})
+CORS(app, origins=[
+    "http://localhost:5173",
+    "https://https://vendorbridge-410c.onrender.com"
+])
 
 # ─── JWT Middleware ───────────────────────────────────────────────────────────
 
