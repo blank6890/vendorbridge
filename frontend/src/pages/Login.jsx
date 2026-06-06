@@ -1,4 +1,4 @@
-﻿import { useState, useRef } from "react";
+import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -66,9 +66,10 @@ const COUNTRIES = [
 ];
 
 const SIGNUP_ROLES = [
-  { value: "Procurement Officer", label: "Procurement Officer", icon: Briefcase, hint: "Create RFQs, compare quotes, raise POs" },
+  { value: "Procurement Officer", label: "Procurement Officer", icon: Briefcase,    hint: "Create RFQs, compare quotes, raise POs" },
   { value: "Manager",             label: "Manager / Approver",  icon: CheckCircle2, hint: "Approve or reject procurement requests" },
   { value: "Vendor",              label: "Vendor",              icon: Truck,        hint: "Submit quotations, track RFQ status" },
+  { value: "Company Admin",       label: "Company Admin",       icon: ShieldCheck,  hint: "Manage users; requires document verification (3 working days)" },
 ];
 
 const DEMO_ACCOUNTS = [
@@ -155,9 +156,13 @@ export default function Login() {
         if (u?.role === "Admin" || u?.status === "Active") {
           navigate("/dashboard");
         } else {
+          const pendingMsg =
+            form.role === "Company Admin" || form.role === "Vendor"
+              ? "Registration received. We will email you requesting verification documents. Approval takes up to 3 working days."
+              : "Account created. A Company Admin must approve your access before you can sign in.";
           setBanner({
             type: "success",
-            msg: "Account created. An Admin must approve your access before you can sign in.",
+            msg: pendingMsg,
           });
           setMode("signin");
         }
@@ -415,7 +420,7 @@ export default function Login() {
                       })}
                     </div>
                     <p className="mt-2 text-xs text-slate-400">
-                      The very first account created becomes the system Admin automatically.
+                      Officers and Managers await Company Admin approval. Vendors and Company Admins require document verification within 3 working days.
                     </p>
                   </div>
                 </>
