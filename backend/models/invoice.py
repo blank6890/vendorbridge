@@ -1,24 +1,9 @@
-from pymongo import MongoClient
-from config import MONGO_URI, DB_NAME
-
-client = MongoClient(MONGO_URI)
-db = client[DB_NAME]
+from db import get_db
 
 
 def get_invoice_collection():
-    """Return the invoices collection.
-
-    Schema:
-    {
-        poId: str,              # purchase_order ObjectId string
-        invoiceNumber: str,     # auto-generated: INV-001, INV-002, ...
-        tax: float,
-        total: float,
-        status: str,            # "unpaid" | "paid"
-        created_at: datetime
-    }
-    """
-    return db["invoices"]
+    """Return the invoices collection."""
+    return get_db()["invoices"]
 
 
 def get_next_invoice_number():

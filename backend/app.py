@@ -3,8 +3,10 @@ import os
 import jwt
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from pymongo.errors import PyMongoError, ServerSelectionTimeoutError
 
 from config import FLASK_DEBUG, JWT_ALGORITHM, JWT_SECRET
+from db import check_database_connection, get_db, mongo_error_response
 
 from routes.admin import admin_bp
 from routes.approvals import approvals_bp
@@ -66,14 +68,7 @@ def jwt_middleware():
 @require_roles("admin")
 def get_logs():
     """Return all activity logs, most recent first (admin only)."""
-    from pymongo import MongoClient
-
-    from config import DB_NAME, MONGO_URI
-
-    client = MongoClient(MONGO_URI)
-    db = client[DB_NAME]
-
-    logs = list(db["logs"].find().sort("timestamp", -1))
+    logs = list(get_db()["logs"].find().sort("timestamp", -1))
     for log in logs:
         log["_id"] = str(log["_id"])
         if "timestamp" in log:
@@ -85,11 +80,13 @@ def get_logs():
 @app.route("/", methods=["GET"])
 def health_check():
     """Health check endpoint."""
+    db_ok, db_message = check_database_connection()
     return jsonify(
         {
-            "status": "running",
+            "status": "running" if db_ok else "degraded",
             "app": "VendorBridge API",
             "version": "1.0.0",
+            "database": {"connected": db_ok, "message": db_message},
         }
     ), 200
 
@@ -110,14 +107,23 @@ def not_found(e):
     return jsonify({"error": "Route not found"}), 404
 
 
+@app.errorhandler(ServerSelectionTimeoutError)
+@app.errorhandler(PyMongoError)
+def database_error(e):
+    body, status = mongo_error_response(e)
+    return jsonify(body), status
+
+
 @app.errorhandler(500)
 def internal_error(e):
     return jsonify({"error": "Internal server error"}), 500
 
 
 if __name__ == "__main__":
+    db_ok, db_message = check_database_connection()
     print("=" * 50)
     print("  VendorBridge API Server")
     print("  Running on http://localhost:5000")
+    print(f"  Database: {db_message}")
     print("=" * 50)
     app.run(debug=FLASK_DEBUG, port=5000)

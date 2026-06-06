@@ -8,13 +8,18 @@ Usage:
 All seed users use the password: password123
 """
 
-from pymongo import MongoClient
 from datetime import datetime, timezone
-import bcrypt
-from config import MONGO_URI, DB_NAME
 
-client = MongoClient(MONGO_URI)
-db = client[DB_NAME]
+import bcrypt
+
+from config import DB_NAME
+from db import check_database_connection, get_db
+
+db_ok, db_message = check_database_connection()
+if not db_ok:
+    raise SystemExit(f"Cannot seed database: {db_message}")
+
+db = get_db()
 
 
 def hash_password(password):
@@ -95,7 +100,7 @@ def seed():
     """Run the seed script."""
     print("[*] Seeding VendorBridge database...")
     print(f"    Database: {DB_NAME}")
-    print(f"    MongoDB:  {MONGO_URI}")
+    print(f"    MongoDB:  connected to {DB_NAME}")
     print()
 
     # --- Seed Users ---

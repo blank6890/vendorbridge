@@ -1,0 +1,2 @@
+{"sessionId": "5d99b0", "hypothesisId": "DB", "location": "db.py:check_database_connection", "message": "server selection timeout", "data": {"db": "vendorbridge"}, "timestamp": 1780740900530}
+{"sessionId": "5d99b0", "hypothesisId": "DB", "location": "db.py:mongo_error_response", "message": "request failed", "data": {"error": "localhost:27017: [WinError 10061] No connection could be made because the target machine actively refused it (configured timeouts: socketTimeoutMS: 5000.0ms, connectTimeoutMS: 5000.0ms), Timeout: 5.0s"}, "timestamp": 1780740905636}
