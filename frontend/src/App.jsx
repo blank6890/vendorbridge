@@ -100,7 +100,7 @@ export default function App() {
             <Route
               path="vendors"
               element={
-                <ProtectedRoute roles={["Admin", "Procurement Officer"]}>
+                <ProtectedRoute roles={["Admin", "Procurement Officer", "Manager"]}>
                   <Vendors />
                 </ProtectedRoute>
               }
@@ -127,7 +127,7 @@ export default function App() {
             <Route
               path="approvals"
               element={
-                <ProtectedRoute roles={["Manager"]}>
+                <ProtectedRoute roles={["Procurement Officer", "Manager"]}>
                   <Approvals />
                 </ProtectedRoute>
               }
